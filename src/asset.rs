@@ -1,11 +1,8 @@
-
+use crate::directory::{self};
 use std::collections::{HashMap};
 use std::error::{Error};
 use std::fs::{DirEntry};
 use std::path::{PathBuf};
-
-#[path = "directory.rs"]
-mod directory;
 
 pub struct Assets {
 	pub file_map: HashMap<PathBuf, DirEntry>,
