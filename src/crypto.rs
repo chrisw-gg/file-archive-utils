@@ -2,10 +2,8 @@ use crate::directory::{Directory};
 
 use chrono::{DateTime, Utc};
 use std::fs::{File, DirEntry};
-use std::io::{self, Write};
 use std::error::Error;
 use std::path::{PathBuf};
-// use yaml_rust2::{YamlLoader, YamlEmitter};
 use sha2::{Sha256, Digest};
 use std::io::{BufRead, BufReader};
 
@@ -83,22 +81,6 @@ impl Crypto {
 		let base64 = format!("{:X}", hash);
 
 		Ok(base64)
-	}
-
-
-	fn write_file() -> io::Result<()> {
-		let path = "output.txt";
-		let mut file = File::create(path)?;
-
-		// Write a byte slice directly
-		file.write_all(b"Some data!\n")?;
-
-		// Use the write! macro for formatted strings
-		let name = "Rust";
-		let version = "1.x";
-		writeln!(file, "Hello, {} version {}!", name, version)?;
-
-		Ok(())
 	}
 
 }

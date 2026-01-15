@@ -1,16 +1,11 @@
 use crate::asset::{Assets};
-use crate::crypto::{Crypto, FileHash, HashResult};
+use crate::crypto::{Crypto, FileHash};
 use crate::directory::{Directory};
-use crate::meta::{self, MetaData, MetaDataError};
+use crate::meta::{MetaData, MetaDataError};
 
-use chrono::{DateTime, Utc};
-use std::collections::{HashMap};
 use std::error::{Error};
 use std::fs::{DirEntry};
-use std::path::{PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::{Uuid};
-
 
 pub struct ValidateOptions {
 	pub timestamps: bool,
@@ -26,10 +21,6 @@ pub enum LogLevel {
 }
 
 pub struct Validate {
-
-}
-
-struct UpdateResult {
 
 }
 
@@ -64,8 +55,8 @@ impl Validate {
 				None => {},
 			};
 			
-
 		}
+
 	}
 
 	fn validate_and_update_metadata_file(file: &DirEntry, options: &ValidateOptions) -> std::result::Result<Option<String>, Box<dyn Error>> {
