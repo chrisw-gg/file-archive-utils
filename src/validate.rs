@@ -36,7 +36,8 @@ struct UpdateResult {
 enum ValidationResult {
 	Valid { metadata: MetaData },
 	MissingMetadata,
-	TimestampMismatch,
+	MissingMetadataHistory { metadata: MetaData },
+	TimestampMismatch { metadata: MetaData },
 	HashMismatch { metadata: MetaData, file_hash: FileHash },
 }
 
@@ -69,16 +70,20 @@ impl Validate {
 
 	fn validate_and_update_metadata_file(file: &DirEntry, options: &ValidateOptions) -> std::result::Result<Option<String>, Box<dyn Error>> {
 		
-		let result = Validate::validate_file(file, options)?;
+		let mut result = Validate::validate_file(file, options)?;
 
 		let update_because = match &result {
 			ValidationResult::Valid { .. } => "no update",
 			ValidationResult::MissingMetadata => "updated because missing metadata",
-			ValidationResult::TimestampMismatch => "updated because timestamp mismatch",
+			ValidationResult::MissingMetadataHistory { .. } => "updated because missing metadata history",
+			ValidationResult::TimestampMismatch { .. } => "updated because timestamp mismatch",
 			ValidationResult::HashMismatch { .. } => "updated because hash mismatch",
 		};
 
-		let metadata = match result {
+		// TODO: Not sure how to allocate a mut reference inside the match statement and borrow it later
+		let mut borrowable_metadata = MetaData::new(Uuid::new_v4());
+
+		let metadata: &mut MetaData = match &mut result {
 			ValidationResult::Valid { metadata } => {
 				
 				return Ok(match options.log_level {
@@ -87,20 +92,14 @@ impl Validate {
 				});
 
 			}
-			ValidationResult::MissingMetadata | ValidationResult::TimestampMismatch => { // NO... WRONG timestamp has metadata file already
-
-				let file_hash = Crypto::sha256(file)?;
-
-				MetaData {
-					id: Uuid::new_v4().into(),
-					name: file.path().to_string_lossy().to_string(),
-					file_hash: file_hash,
-				}
-
+			ValidationResult::MissingMetadata => {
+				borrowable_metadata.with_file_hash(Crypto::sha256(file)?)
+			},
+			ValidationResult::MissingMetadataHistory { metadata } | ValidationResult::TimestampMismatch { metadata } => {
+				metadata.with_file_hash(Crypto::sha256(file)?)
 			},
 			ValidationResult::HashMismatch { metadata, file_hash } => {
-				// metadata.file_hash = file_hash;
-				metadata
+				metadata.with_file_hash(Crypto::sha256(file)?)
 			}
 		};
 
@@ -146,23 +145,24 @@ impl Validate {
 			}
 		};
 
+		let Some(metadata_file_hash) = metadata.last_file_hash() else {
+			return Ok(ValidationResult::MissingMetadataHistory { metadata: metadata } );
+		};
+
 		// TODO: Check if metadata is later than file timestamp...
 
-		if last_modified_time != metadata.file_hash.last_modified_time {
+		if last_modified_time != metadata_file_hash.last_modified_time {
 			// options.verbose.then(|| println!("{} -> timestamp mismatch file.time({}) != metadata.time({})", file.path().display(), last_modified_time, metadata.file_hash.last_modified_time));
-			return Ok(ValidationResult::TimestampMismatch);
+			return Ok(ValidationResult::TimestampMismatch { metadata: metadata } );
 		}
 
 		if options.contents {
 
 			let file_hash= Crypto::sha256(file)?;
 
-			if file_hash.sha256 != metadata.file_hash.sha256 {
+			if file_hash.sha256 != metadata_file_hash.sha256 {
 				// options.verbose.then(|| println!("{} -> hash mismatch file.hash({:?}) != metadata.hash({:?})", file.path().display(), file_hash, metadata.file_hash));
-				return Ok(ValidationResult::HashMismatch {
-					metadata: metadata,
-					file_hash: file_hash
-				});
+				return Ok(ValidationResult::HashMismatch { metadata: metadata, file_hash: file_hash } );
 			}
 
 		}

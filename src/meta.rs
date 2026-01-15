@@ -5,12 +5,12 @@ use std::error::{Error};
 use std::fs::{self, DirEntry};
 use std::path::{PathBuf};
 use serde::{Serialize, Deserialize};
+use uuid::{Uuid};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct MetaData {
-	pub id: String,
-	pub name: String,
-	pub file_hash: FileHash,
+	id: String,
+	history: Vec<FileHash>,
 }
 
 pub enum MetaDataError {
@@ -20,6 +20,22 @@ pub enum MetaDataError {
 }
 
 impl MetaData {
+
+	pub fn new(id: Uuid) -> MetaData {
+		MetaData {
+			id: id.into(),
+			history: Vec::new(),
+		}
+	}
+
+	pub fn last_file_hash(&self) -> Option<&FileHash> {
+		self.history.last()
+	}
+
+	pub fn with_file_hash(&mut self, file_hash: FileHash) -> &mut Self {
+		self.history.push(file_hash);
+		self
+	}
 
 	pub fn read(file: &DirEntry) -> Result<MetaData, MetaDataError> {
 		let path = Self::path_for_metadata_file(file);

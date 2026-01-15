@@ -15,6 +15,7 @@ pub struct Crypto {
 
 #[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FileHash {
+	pub path: PathBuf,
 	pub last_modified_time: DateTime<Utc>,
 	pub sha256: String,
 }
@@ -31,6 +32,7 @@ impl Crypto {
 		match Self::sha256_file(file) {
 			HashResult::Success { last_modified_time, sha256 } => {
 				let hash = FileHash{
+					path: file.path(),
 					last_modified_time: last_modified_time,
 					sha256: sha256,
 				};
