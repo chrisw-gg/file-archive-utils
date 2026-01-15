@@ -1,4 +1,4 @@
-use crate::directory::{self};
+use crate::directory::{Directory};
 use std::collections::{HashMap};
 use std::error::{Error};
 use std::fs::{DirEntry};
@@ -14,7 +14,7 @@ impl Assets {
 	
 	pub fn new() -> Result<Assets, Box<dyn Error>> {
 
-		let files = directory::read_files("/workdir/foo")?;
+		let files = Directory::read_files("/workdir/foo")?;
 
 		let mut assets = Assets {
 			file_map: HashMap::new(),

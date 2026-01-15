@@ -1,15 +1,15 @@
+#![allow(warnings)] // TODO: Temporary while refactoring
+
 mod asset;
 mod crypto;
 mod directory;
 mod meta;
-mod update;
 mod validate;
 
 use std::env;
 use std::error::{Error};
 
 use asset::{Assets};
-use update::{Update};
 use validate::{Validate, ValidateOptions};
 
 fn main() {
@@ -30,17 +30,16 @@ fn run() -> Result<(), Box<dyn Error>> {
 		contents: args.iter().find(|a| a.as_str() == "--contents").is_some(),
 		dry_run: args.iter().find(|a| a.as_str() == "--dry-run").is_some(),
 		detailed: args.iter().find(|a| a.as_str() == "--detailed").is_some(),
+		verbose: args.iter().find(|a| a.as_str() == "--verbose").is_some(),
 	};
-
-	let assets = Assets::new().unwrap();
-		
-	let validation_results = Validate::validate(&assets, &options);
 	
-	if options.detailed {
-		Validate::print_results(&validation_results);
-	}
+	let assets = Assets::new().unwrap();
 
-	Update::update_meta_files(&validation_results, &options);
+	Validate::validate_and_update_metadata(&assets, &options);
+	
+	//if options.detailed {
+	//	Validate::print_results(&validation_results);
+	//}
 	
 	Ok(())
 
