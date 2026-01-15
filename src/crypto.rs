@@ -1,11 +1,9 @@
-use crate::directory::{Directory};
-
 use chrono::{DateTime, Utc};
 use std::fs::{File, DirEntry};
 use std::error::Error;
 use std::path::{PathBuf};
 use sha2::{Sha256, Digest};
-use std::io::{BufRead, BufReader};
+use std::io::{Read};
 
 pub struct Crypto {
 
@@ -18,68 +16,49 @@ pub struct FileHash {
 	pub sha256: String,
 }
 
-pub enum HashResult {
-	Success { last_modified_time: DateTime<Utc>, sha256: String },
-	FileModified { before: DateTime<Utc>, after: DateTime<Utc> },
-	Error { message: String },
-}
-
 impl Crypto {
 
 	pub fn sha256(file: &DirEntry) -> Result<FileHash, Box<dyn Error>> {
-		// println!("Hashing file: {}", file.path().display());
-		match Self::sha256_file(file) {
-			HashResult::Success { last_modified_time, sha256 } => {
-				let hash = FileHash{
-					path: file.path(),
-					last_modified_time: last_modified_time,
-					sha256: sha256,
-				};
-				Ok(hash)
-			}
-			HashResult::FileModified { before, after } => {
-				let message = format!("File modified while hashing before: {} after: {}", before, after);
-				Err(message.into())
-			}
-			HashResult::Error { message } => Err(message.into())
-		}
-	}
+		let path = file.path();
+		let mut open_file = File::open(&path)?;
 
-	// Attempt to ensure consistency in cases of file changing while hashing it
-	// Compare the last modified time from before and after the hash
-	// TODO: This may not actually work if the modified time is just stored in the direntry...
-	fn sha256_file(file: &DirEntry) -> HashResult {
-		let modified_before = Directory::last_modified_time(file);
+		open_file.lock()?;
 
-		let file_hash = match Self::stream_sha256(file.path()) {
-			Ok(hash) => hash,
-			Err(error) => return HashResult::Error { message: error.to_string() },
+		let file_modified:  DateTime<Utc> = std::fs::metadata(&path)?.modified()?.into();
+		let file_hash = Self::stream_sha256(&mut open_file)?;
+
+		open_file.unlock()?;
+
+		let result = FileHash {
+			path: path,
+			last_modified_time: file_modified,
+			sha256: file_hash
 		};
 
-		let modified_after = Directory::last_modified_time(file);
-
-		if modified_before != modified_after {
-			return HashResult::FileModified { before: modified_before, after: modified_after };
-		}
-
-		return HashResult::Success { last_modified_time: modified_before, sha256: file_hash }
+		Ok(result)
 	}
 
-	// TODO: Does not match linux sha256sum...try reading file as binary in chunks
-	fn stream_sha256(path: PathBuf) -> Result<String, Box<dyn Error>> {
-		let file = File::open(path)?;
-		let reader = BufReader::new(file);
+	fn stream_sha256(open_file: &mut File) -> Result<String, Box<dyn Error>> {
+		const CHUNK_SIZE: usize = 1024;
 
 		let mut hasher = Sha256::new();
 
-		for line_result in reader.lines() {
-			let l = line_result?;
-			println!("{}", &l);
-			hasher.update(&l);
+		loop {
+
+			let mut buffer = [0u8; CHUNK_SIZE];
+
+			let bytes_read = open_file.read(&mut buffer)?;
+
+			if bytes_read == 0 {
+				break;
+			}
+
+			hasher.update(&buffer[..bytes_read]);
+
 		}
 
 		let hash = hasher.finalize();
-		let base64 = format!("{:X}", hash);
+		let base64 = format!("{:x}", hash);
 
 		Ok(base64)
 	}
