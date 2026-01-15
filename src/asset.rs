@@ -7,7 +7,6 @@ use std::path::{PathBuf};
 pub struct Assets {
 	pub file_map: HashMap<PathBuf, DirEntry>,
 	pub meta_map: HashMap<PathBuf, DirEntry>,
-	pub hash_map: HashMap<PathBuf, String>,
 }
 
 impl Assets {
@@ -19,7 +18,6 @@ impl Assets {
 		let mut assets = Assets {
 			file_map: HashMap::new(),
 			meta_map: HashMap::new(),
-			hash_map: HashMap::new(),
 		};
 
 		for file in files {

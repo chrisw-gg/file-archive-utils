@@ -11,7 +11,7 @@ pub struct Crypto {
 
 }
 
-#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FileHash {
 	pub path: PathBuf,
 	pub last_modified_time: DateTime<Utc>,
@@ -27,6 +27,7 @@ pub enum HashResult {
 impl Crypto {
 
 	pub fn sha256(file: &DirEntry) -> Result<FileHash, Box<dyn Error>> {
+		// println!("Hashing file: {}", file.path().display());
 		match Self::sha256_file(file) {
 			HashResult::Success { last_modified_time, sha256 } => {
 				let hash = FileHash{

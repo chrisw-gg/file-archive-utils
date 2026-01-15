@@ -27,6 +27,10 @@ impl MetaData {
 		}
 	}
 
+	pub fn identifier(&self) -> &str {
+		&self.id
+	}
+
 	pub fn last_file_hash(&self) -> Option<&FileHash> {
 		self.history.last()
 	}

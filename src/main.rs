@@ -1,5 +1,3 @@
-// #![allow(warnings)] // TODO: Temporary while refactoring
-
 mod asset;
 mod crypto;
 mod directory;
@@ -13,7 +11,7 @@ use asset::{Assets};
 use validate::{LogLevel, Validate, ValidateOptions};
 
 fn main() {
-	run();
+	run().unwrap();
 }
 
 fn run() -> Result<(), Box<dyn Error>> {
@@ -34,7 +32,6 @@ fn options() -> ValidateOptions {
 	}
 
 	ValidateOptions {
-		timestamps: has_arg("--timestamps", &args),
 		contents: has_arg("--contents", &args),
 		dry_run: has_arg("--dry-run", &args),
 		log_level: if has_arg("--verbose", &args) {

@@ -8,7 +8,6 @@ use std::fs::{DirEntry};
 use uuid::{Uuid};
 
 pub struct ValidateOptions {
-	pub timestamps: bool,
 	pub contents: bool,
 	pub dry_run: bool,
 	pub log_level: LogLevel,
@@ -78,7 +77,7 @@ impl Validate {
 			ValidationResult::Valid { metadata } => {
 				
 				return Ok(match options.log_level {
-					LogLevel::Verbose => Some("good".into()),
+					LogLevel::Verbose => Some(format!("good {}", metadata.identifier()).into()),
 					_ => None,
 				});
 
@@ -90,7 +89,7 @@ impl Validate {
 				metadata.with_file_hash(Crypto::sha256(file)?)
 			},
 			ValidationResult::HashMismatch { metadata, file_hash } => {
-				metadata.with_file_hash(Crypto::sha256(file)?)
+				metadata.with_file_hash(file_hash.clone())
 			}
 		};
 
@@ -142,20 +141,20 @@ impl Validate {
 
 		// TODO: Check if metadata is later than file timestamp...
 
-		if last_modified_time != metadata_file_hash.last_modified_time {
-			// options.verbose.then(|| println!("{} -> timestamp mismatch file.time({}) != metadata.time({})", file.path().display(), last_modified_time, metadata.file_hash.last_modified_time));
-			return Ok(ValidationResult::TimestampMismatch { metadata: metadata } );
-		}
+		if !options.contents {
 
-		if options.contents {
-
-			let file_hash= Crypto::sha256(file)?;
-
-			if file_hash.sha256 != metadata_file_hash.sha256 {
-				// options.verbose.then(|| println!("{} -> hash mismatch file.hash({:?}) != metadata.hash({:?})", file.path().display(), file_hash, metadata.file_hash));
-				return Ok(ValidationResult::HashMismatch { metadata: metadata, file_hash: file_hash } );
+			if last_modified_time != metadata_file_hash.last_modified_time {
+				// options.verbose.then(|| println!("{} -> timestamp mismatch file.time({}) != metadata.time({})", file.path().display(), last_modified_time, metadata.file_hash.last_modified_time));
+				return Ok(ValidationResult::TimestampMismatch { metadata: metadata } );
 			}
 
+		}
+
+		let file_hash= Crypto::sha256(file)?;
+
+		if file_hash.sha256 != metadata_file_hash.sha256 {
+			// options.verbose.then(|| println!("{} -> hash mismatch file.hash({:?}) != metadata.hash({:?})", file.path().display(), file_hash, metadata.file_hash));
+			return Ok(ValidationResult::HashMismatch { metadata: metadata, file_hash: file_hash } );
 		}
 
 		let result = ValidationResult::Valid { metadata: metadata };
