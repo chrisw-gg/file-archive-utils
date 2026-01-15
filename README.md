@@ -18,4 +18,6 @@ docker run --rm -it -v "$(pwd):/workdir" -w /workdir rust:1.92 bash
 
 cargo build
 
+cargo run -- --verbose --dry-run
+
 cargo run -- --verbose
