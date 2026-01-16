@@ -11,7 +11,7 @@ pub struct Crypto {
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FileHash {
-	pub path: PathBuf,
+	pub file_name: String,
 	pub last_modified_time: DateTime<Utc>,
 	pub sha256: String,
 }
@@ -29,8 +29,12 @@ impl Crypto {
 
 		open_file.unlock()?;
 
+		let Some(file_name) = path.file_name() else {
+			return Err("Could not get file name".into());
+		};
+
 		let result = FileHash {
-			path: path,
+			file_name: file_name.to_string_lossy().to_string(),
 			last_modified_time: file_modified,
 			sha256: file_hash
 		};

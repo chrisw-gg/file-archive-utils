@@ -15,7 +15,7 @@ fn main() {
 }
 
 fn run() -> Result<(), Box<dyn Error>> {
-	let assets = Assets::new().unwrap();
+	let assets = Assets::new("/assets").unwrap();
 	let options = options();
 
 	Validate::validate_and_update_metadata(&assets, &options);

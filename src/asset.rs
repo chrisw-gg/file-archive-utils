@@ -11,9 +11,9 @@ pub struct Assets {
 
 impl Assets {
 	
-	pub fn new() -> Result<Assets, Box<dyn Error>> {
+	pub fn new(directory: &str) -> Result<Assets, Box<dyn Error>> {
 
-		let files = Directory::read_files("/workdir/foo")?;
+		let files = Directory::read_files(directory)?;
 
 		let mut assets = Assets {
 			file_map: HashMap::new(),
