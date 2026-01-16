@@ -3,8 +3,10 @@ use crate::crypto::{Crypto, FileHash};
 use crate::directory::{Directory};
 use crate::meta::{MetaData, MetaDataError};
 
+use color_print::cprintln;
 use std::error::{Error};
 use std::fs::{DirEntry};
+use std::path::{PathBuf};
 use uuid::{Uuid};
 
 pub struct ValidateOptions {
@@ -44,64 +46,61 @@ impl Validate {
 
 	pub fn validate_and_update_metadata(assets: &Assets, options: &ValidateOptions) {
 
+		cprintln!("\n<cyan>Begin</cyan>\n");
+
 		for (id, file) in assets.file_map.iter() {
 
-			let result = Validate::validate_and_update_metadata_file(file, options);
+			match Validate::validate_and_update_metadata_file(file, options) {
+				Ok(result) => result.print_line(id, options),
+				Err(err) => {
+					cprintln!("<red>{} -> {}</red>", id.to_string_lossy(), err.to_string());
+				}
 
-			let string_result = match result {
-				Ok(option) => {
-					match option {
-						Some(msg) => Some(msg),
-						None => None,
-					}
-				},
-				Err(error) => Some(error.to_string()),
-			};
-
-			match string_result {
-				Some(msg) => println!("{} -> {}", id.to_string_lossy(), msg),
-				None => {},
-			};
+			}
 			
 		}
 
+		cprintln!("\n<cyan>End</cyan>\n");
+
 	}
 
-	fn validate_and_update_metadata_file(file: &DirEntry, options: &ValidateOptions) -> std::result::Result<Option<String>, Box<dyn Error>> {
-		
+	fn validate_and_update_metadata_file(file: &DirEntry, options: &ValidateOptions) -> std::result::Result<Result, Box<dyn Error>> {
+
 		let validation_result = Validate::validate_file(file, options)?;
 
-		let result_message = match validation_result {
-			Result::Valid(valid) => valid.result_string(options),
-			Result::Invalid(invalid) => Self::update_metdata_file(file, options, invalid)?,
+		match validation_result {
+			Result::Valid { .. } => {}
+			Result::Invalid(ref invalid) => Self::update_metdata_file(file, options, invalid)?,
 		};
 
-		Ok(result_message)
+		Ok(validation_result)
+
 	}
 
-	fn update_metdata_file(file: &DirEntry, options: &ValidateOptions, mut result: Invalid) -> std::result::Result<Option<String>, Box<dyn Error>> {
-		// TODO: Not sure how to allocate a mut reference inside the match statement and borrow it later
-		let mut borrowable_metadata = MetaData::new(Uuid::new_v4());
+	fn update_metdata_file(file: &DirEntry, options: &ValidateOptions, result: &Invalid) -> std::result::Result<(), Box<dyn Error>> {
 
-		let metadata: &mut MetaData = match &mut result {
+		let metadata= match result {
 			Invalid::MissingMetadata => {
-				borrowable_metadata.with_file_hash(Crypto::sha256(file)?)
+				MetaData::new(Uuid::new_v4()).with_file_hash(Crypto::sha256(file)?)
 			},
 			Invalid::MissingMetadataHistory { metadata } | Invalid::TimestampMismatch { metadata } => {
 				metadata.with_file_hash(Crypto::sha256(file)?)
 			},
 			Invalid::HashMismatch { metadata, file_hash } => {
-				// actually we probably don't want to update on hash mismatch...because that means the file got corrupted?
-				// metadata.with_file_hash(file_hash.clone())
-				return Ok(Some("not updating metadata due to hash mismatch".into()));
+				metadata.with_file_hash(file_hash.clone())
 			}
 		};
 
 		if !options.dry_run {
-			MetaData::update(file, &metadata)?;
+			// Don't update if there is a hash mismatch, this most likely means that the one of the files has been corrupted!
+			match result {
+				Invalid::HashMismatch { .. } => (),
+				_ => MetaData::update(file, &metadata)?,
+			}
 		}
 
-		Ok(result.result_string(options))
+		Ok(())
+
 	}
 
 	fn validate_file(file: &DirEntry, options: &ValidateOptions) -> std::result::Result<Result, Box<dyn Error>> {
@@ -162,12 +161,25 @@ impl Validate {
 
 }
 
+impl Result {
+
+	fn print_line(&self, id: &PathBuf, options: &ValidateOptions) {
+
+		match self {
+			Result::Valid(valid) => valid.print_line(id, options),
+			Result::Invalid(invalid) => invalid.print_line(id, options),
+		}
+
+	}
+
+}
+
 impl Valid {
 
-	fn result_string(&self, options: &ValidateOptions) -> Option<String> {
+	fn print_line(&self, id: &PathBuf, options: &ValidateOptions) {
 		match options.log_level {
-			LogLevel::Verbose => Some(format!("✔ {}", self.to_string()).into()),
-			_ => None, // Print nothing if not verbose
+			LogLevel::Verbose => cprintln!("<green>{} -> {}</green>", id.to_string_lossy(), self.to_string()),
+			_ => return // Print nothing if not verbose
 		}
 	}
 
@@ -182,10 +194,12 @@ impl Valid {
 
 impl Invalid {
 
-	fn result_string(&self, options: &ValidateOptions) -> Option<String> {
-		match options.log_level {
-			_ => Some(format!("updated because {}", self.to_string())),
+	fn print_line(&self, id: &PathBuf, _options: &ValidateOptions) {
+		match self {
+			Invalid::HashMismatch { .. } => cprintln!("<bright-red>{} -> {}<bright-red>", id.to_string_lossy(), self.to_string()),
+			_ => cprintln!("<cyan>{} -> {}</cyan>", id.to_string_lossy(), self.to_string()),
 		}
+		
 	}
 
 	fn to_string(&self) -> &str {

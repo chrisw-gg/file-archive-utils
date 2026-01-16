@@ -6,7 +6,7 @@ use std::path::{PathBuf};
 use serde::{Serialize, Deserialize};
 use uuid::{Uuid};
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MetaData {
 	id: String,
 	history: Vec<FileHash>,
@@ -31,9 +31,10 @@ impl MetaData {
 		self.history.last()
 	}
 
-	pub fn with_file_hash(&mut self, file_hash: FileHash) -> &mut Self {
-		self.history.push(file_hash);
-		self
+	pub fn with_file_hash(&self, file_hash: FileHash) -> Self {
+		let mut clone = self.clone();
+		clone.history.push(file_hash);
+		clone
 	}
 
 	pub fn read(file: &DirEntry) -> Result<MetaData, MetaDataError> {
