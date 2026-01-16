@@ -1,7 +1,7 @@
 use crate::asset::{Assets};
 use crate::crypto::{Crypto, FileHash};
 use crate::directory::{Directory};
-use crate::meta::{MetaData, MetaDataError};
+use crate::meta::{MetaData, MetaDataError, MetadataTimestampComparison};
 
 use color_print::cprintln;
 use std::error::{Error};
@@ -32,13 +32,13 @@ enum Result {
 
 enum Valid {
 	TimestampMatches,
-	HashMatches,
+	HashAndTimestampMatches,
 }
 
 enum Invalid {
 	MissingMetadata,
 	MissingMetadataHistory { metadata: MetaData },
-	TimestampMismatch { metadata: MetaData },
+	FileModified { metadata: MetaData },
 	HashMismatch { metadata: MetaData, file_hash: FileHash },
 }
 
@@ -83,7 +83,7 @@ impl Validate {
 			Invalid::MissingMetadata => {
 				MetaData::new(Uuid::new_v4()).with_file_hash(Crypto::sha256(file)?)
 			},
-			Invalid::MissingMetadataHistory { metadata } | Invalid::TimestampMismatch { metadata } => {
+			Invalid::MissingMetadataHistory { metadata } | Invalid::FileModified { metadata } => {
 				metadata.with_file_hash(Crypto::sha256(file)?)
 			},
 			Invalid::HashMismatch { metadata, file_hash } => {
@@ -136,25 +136,24 @@ impl Validate {
 			return Ok(Result::Invalid(Invalid::MissingMetadataHistory { metadata: metadata }));
 		};
 
-		// TODO: Check if metadata is later than file timestamp...
-
-		if !options.contents {
-
-			if last_modified_time != metadata_file_hash.last_modified_time {
-				// options.verbose.then(|| println!("{} -> timestamp mismatch file.time({}) != metadata.time({})", file.path().display(), last_modified_time, metadata.file_hash.last_modified_time));
-				return Ok(Result::Invalid(Invalid::TimestampMismatch { metadata: metadata }));
+		match MetaData::compare_timestamp(&metadata_file_hash, last_modified_time) {
+			MetadataTimestampComparison::Error => return Err("Metadata timestamp is later than file timestamp ???".into()),
+			MetadataTimestampComparison::FileModified => return Ok(Result::Invalid(Invalid::FileModified { metadata: metadata })),
+			MetadataTimestampComparison::Equal => {
+				// If we are not doing a full validation (checking contents as well as timestamp) then we can exit early
+				if !options.contents {
+					return Ok(Result::Valid(Valid::TimestampMatches));
+				}
 			}
-
 		}
 
 		let file_hash= Crypto::sha256(file)?;
 
 		if file_hash.sha256 != metadata_file_hash.sha256 {
-			// options.verbose.then(|| println!("{} -> hash mismatch file.hash({:?}) != metadata.hash({:?})", file.path().display(), file_hash, metadata.file_hash));
 			return Ok(Result::Invalid(Invalid::HashMismatch { metadata, file_hash }));
 		}
 
-		let result = Result::Valid(Valid::HashMatches);
+		let result = Result::Valid(Valid::HashAndTimestampMatches);
 		Ok(result)
 
 	}
@@ -185,8 +184,8 @@ impl Valid {
 
 	fn to_string(&self) -> &str {
 		match self {
-			Valid::TimestampMatches => "timestamp matches",
-			Valid::HashMatches => "hash matches",
+			Valid::TimestampMatches => "✓ timestamp",
+			Valid::HashAndTimestampMatches => "✓ hash ✓ timestamp",
 		}
 	}
 
@@ -206,7 +205,7 @@ impl Invalid {
 		match self {
 			Invalid::MissingMetadata => "missing metadata",
 			Invalid::MissingMetadataHistory { .. } => "missing metadata history",
-			Invalid::TimestampMismatch { .. } => "timestamp mismatch",
+			Invalid::FileModified { .. } => "file modified",
 			Invalid::HashMismatch { .. } => "hash mismatch",
 		}
 	}

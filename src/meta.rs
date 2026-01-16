@@ -1,5 +1,6 @@
 use crate::crypto::{FileHash};
 
+use chrono::{DateTime, Utc};
 use std::error::{Error};
 use std::fs::{self, DirEntry};
 use std::path::{PathBuf};
@@ -16,6 +17,12 @@ pub enum MetaDataError {
 	NotFound,
 	ReadError { error: String },
 	ParseError { error: String },
+}
+
+pub enum MetadataTimestampComparison {
+	Equal,
+	FileModified,
+	Error,
 }
 
 impl MetaData {
@@ -35,6 +42,16 @@ impl MetaData {
 		let mut clone = self.clone();
 		clone.history.push(file_hash);
 		clone
+	}
+
+	pub fn compare_timestamp(hash: &FileHash, file_timestamp: DateTime<Utc>) -> MetadataTimestampComparison {
+		if file_timestamp == hash.last_modified_time {
+			MetadataTimestampComparison::Equal
+		} else if file_timestamp > hash.last_modified_time {
+			MetadataTimestampComparison::FileModified
+		} else {
+			MetadataTimestampComparison::Error
+		}
 	}
 
 	pub fn read(file: &DirEntry) -> Result<MetaData, MetaDataError> {
