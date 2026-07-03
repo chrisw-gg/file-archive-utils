@@ -70,7 +70,11 @@ impl Validate {
 
 		match validation_result {
 			Result::Valid { .. } => {}
-			Result::Invalid(ref invalid) => Self::update_metdata_file(file, options, invalid)?,
+			Result::Invalid(ref invalid) => {
+				if !options.dry_run {
+					Self::update_metdata_file(file, options, invalid)?
+				}
+			}
 		};
 
 		Ok(validation_result)
@@ -79,7 +83,7 @@ impl Validate {
 
 	fn update_metdata_file(file: &DirEntry, options: &ValidateOptions, result: &Invalid) -> std::result::Result<(), Box<dyn Error>> {
 
-		let metadata= match result {
+		let metadata = match result {
 			Invalid::MissingMetadata => {
 				MetaData::new(Uuid::new_v4()).with_file_hash(Crypto::sha256(file)?)
 			},
@@ -91,12 +95,10 @@ impl Validate {
 			}
 		};
 
-		if !options.dry_run {
-			// Don't update if there is a hash mismatch, this most likely means that the one of the files has been corrupted!
-			match result {
-				Invalid::HashMismatch { .. } => (),
-				_ => MetaData::update(file, &metadata)?,
-			}
+		// Don't update if there is a hash mismatch, this most likely means that the one of the files has been corrupted!
+		match result {
+			Invalid::HashMismatch { .. } => (),
+			_ => MetaData::update(file, &metadata)?,
 		}
 
 		Ok(())
