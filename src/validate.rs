@@ -9,12 +9,14 @@ use std::fs::{DirEntry};
 use std::path::{PathBuf};
 use uuid::{Uuid};
 
+#[derive(Debug)]
 pub struct ValidateOptions {
 	pub contents: bool,
 	pub dry_run: bool,
 	pub log_level: LogLevel,
 }
 
+#[derive(Debug)]
 pub enum LogLevel {
 	Minimal,
 	Default,

@@ -4,42 +4,69 @@ mod directory;
 mod meta;
 mod validate;
 
-use clap::Parser;
-use std::env;
-use std::error::{Error};
+use clap::{Args, Parser, Subcommand};
 use std::path::{PathBuf};
 
 use asset::{Assets};
 use validate::{LogLevel, Validate, ValidateOptions};
 
-use crate::validate::LogLevel::Default;
-
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
-struct Args {
-	#[arg(long, default_value_t = false)]
-	contents: bool,
-
-	#[arg(long, default_value_t = true)]
-	dry_run: bool,
-
+struct Cli {
 	#[arg(long, default_value_t = false)]
 	verbose: bool,
+
+	#[command(subcommand)]
+	command: Commands,
+}
+
+#[derive(Subcommand, Debug)]
+enum Commands {
+	Validate(ValidateArgs),
+	Update(UpdateArgs),
+}
+
+#[derive(Args, Debug)]
+struct ValidateArgs {
+	#[arg(long, default_value_t = false)]
+	quick: bool,
+
+	#[arg(default_value = ".")]
+	directory: PathBuf,
+}
+
+#[derive(Args, Debug)]
+struct UpdateArgs {
+	#[arg(long, default_value_t = false)]
+	quick: bool,
 
 	#[arg(default_value = ".")]
 	directory: PathBuf,
 }
 
 fn main() {
-	let args = Args::parse();
+	let args = Cli::parse();
 
 	let options = ValidateOptions {
-		contents: args.contents,
-		dry_run: args.dry_run,
+		contents: match args.command {
+			Commands::Validate(ref args) => !args.quick,
+			Commands::Update(ref args) => !args.quick,
+		},
+		dry_run: match args.command {
+			Commands::Validate(..) => true,
+			Commands::Update(..) => false,
+		},
 		log_level: if args.verbose { LogLevel::Verbose } else { LogLevel::Default }
 	};
+
+	let directory = match args.command {
+		Commands::Validate(ref args) => &args.directory,
+		Commands::Update(ref args) => &args.directory,
+	};
+
+	println!("{:?}", options);
 	
-	let assets = Assets::new(&args.directory).unwrap();
+	let assets = Assets::new(&directory).unwrap();
 
 	Validate::validate_and_update_metadata(&assets, &options);
 	
