@@ -18,7 +18,6 @@ pub struct ValidateOptions {
 
 #[derive(Debug)]
 pub enum LogLevel {
-	Minimal,
 	Default,
 	Verbose,
 }
@@ -83,7 +82,7 @@ impl Validate {
 
 	}
 
-	fn update_metdata_file(file: &DirEntry, options: &ValidateOptions, result: &Invalid) -> std::result::Result<(), Box<dyn Error>> {
+	fn update_metdata_file(file: &DirEntry, _options: &ValidateOptions, result: &Invalid) -> std::result::Result<(), Box<dyn Error>> {
 
 		let metadata = match result {
 			Invalid::MissingMetadata => {
