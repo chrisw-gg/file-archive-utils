@@ -2,7 +2,7 @@ use crate::directory::{Directory};
 use std::collections::{HashMap};
 use std::error::{Error};
 use std::fs::{DirEntry};
-use std::path::{PathBuf};
+use std::path::{Path, PathBuf};
 
 pub struct Assets {
 	pub file_map: HashMap<PathBuf, DirEntry>,
@@ -11,7 +11,7 @@ pub struct Assets {
 
 impl Assets {
 	
-	pub fn new(directory: &str) -> Result<Assets, Box<dyn Error>> {
+	pub fn new(directory: &Path) -> Result<Assets, Box<dyn Error>> {
 
 		let files = Directory::read_files(directory)?;
 

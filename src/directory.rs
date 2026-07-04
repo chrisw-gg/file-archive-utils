@@ -13,14 +13,13 @@ struct DirectoryIter {
 
 impl Directory {
 
-	pub fn read_files(directory: &str) -> Result<Vec<DirEntry>, Box<dyn Error>> {
-		let path = Path::new(&directory);
+	pub fn read_files(directory: &Path) -> Result<Vec<DirEntry>, Box<dyn Error>> {
 
 		let iter = &mut DirectoryIter {
 			files: Vec::new()
 		};
 
-		iter.walk_directory(path)?;
+		iter.walk_directory(directory)?;
 
 		let files = std::mem::take(&mut iter.files);
 

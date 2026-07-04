@@ -4,42 +4,43 @@ mod directory;
 mod meta;
 mod validate;
 
+use clap::Parser;
 use std::env;
 use std::error::{Error};
+use std::path::{PathBuf};
 
 use asset::{Assets};
 use validate::{LogLevel, Validate, ValidateOptions};
 
-fn main() {
-	run().unwrap();
+use crate::validate::LogLevel::Default;
+
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+	#[arg(long, default_value_t = false)]
+	contents: bool,
+
+	#[arg(long, default_value_t = true)]
+	dry_run: bool,
+
+	#[arg(long, default_value_t = false)]
+	verbose: bool,
+
+	#[arg(default_value = ".")]
+	directory: PathBuf,
 }
 
-fn run() -> Result<(), Box<dyn Error>> {
-	let assets = Assets::new("/assets").unwrap();
-	let options = options();
+fn main() {
+	let args = Args::parse();
+
+	let options = ValidateOptions {
+		contents: args.contents,
+		dry_run: args.dry_run,
+		log_level: if args.verbose { LogLevel::Verbose } else { LogLevel::Default }
+	};
+	
+	let assets = Assets::new(&args.directory).unwrap();
 
 	Validate::validate_and_update_metadata(&assets, &options);
 	
-	Ok(())
-}
-
-fn options() -> ValidateOptions {
-
-	let args: Vec<String> = env::args().collect();
-
-	fn has_arg(argument: &str, args: &Vec<String>) -> bool {
-		args.iter().find(|a| a.as_str() == argument).is_some()
-	}
-
-	ValidateOptions {
-		contents: has_arg("--contents", &args),
-		dry_run: has_arg("--dry-run", &args),
-		log_level: if has_arg("--verbose", &args) {
-			LogLevel::Verbose
-		} else if has_arg("--minimal", &args) { 
-			LogLevel::Minimal
-		} else {
-			LogLevel::Default
-		},
-	}
 }
