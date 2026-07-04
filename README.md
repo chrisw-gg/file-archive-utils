@@ -1,4 +1,10 @@
 # My first rust project -- file archiving utilities.
 
+### install:
+cargo install --git https://github.com/chrisw-gg/file-archive-utils
+
 ### usage:
-sudo docker run --rm -v "$(pwd):/assets" ghcr.io/chrisw-gg/file-archive-utils:main validate -- --contents --verbose --dry-run
+~/.cargo/bin/file-archive-utils
+
+### build and run locally:
+cargo run
