@@ -7,4 +7,5 @@ cargo install --git https://github.com/chrisw-gg/file-archive-utils
 ~/.cargo/bin/file-archive-utils
 
 ### build and run locally:
-cargo run
+cargo run validate ./test/
+cargo run update ./test/
