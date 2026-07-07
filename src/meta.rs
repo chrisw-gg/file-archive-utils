@@ -38,6 +38,12 @@ impl MetaData {
 		self.history.last()
 	}
 
+	pub fn previous_file_hash(&self) -> Option<&FileHash> {
+		let mut rev = self.history.iter().rev();
+		let (_first, second) = (rev.next(), rev.next());
+		second
+	}
+
 	pub fn with_file_hash(&self, file_hash: FileHash) -> Self {
 		let mut clone = self.clone();
 		clone.history.push(file_hash);

@@ -45,40 +45,63 @@ enum Invalid {
 
 impl Validate {
 
-	pub fn validate_and_update_metadata(assets: &Assets, options: &ValidateOptions) {
+	pub fn validate_and_update_metadata(assets: &Assets, options: &ValidateOptions) -> std::result::Result<bool, Box<dyn Error>> {
 
-		cprintln!("\n<cyan>Begin</cyan>\n");
+		let mut invalids: Vec<Invalid> = Vec::new();
+
+		cprintln!("<cyan>Validating files...</cyan>");
 
 		for (id, file) in assets.file_map.iter() {
 
-			match Validate::validate_and_update_metadata_file(file, options) {
-				Ok(result) => result.print_line(id, options),
-				Err(err) => {
-					cprintln!("<red>{} -> {}</red>", id.to_string_lossy(), err.to_string());
-				}
+			let val = Validate::validate_file(file, options)?;
 
-			}
-			
+			// val.print_line(id, options);
+
+			match val {
+				Result::Valid(valid) => valid.print_line(id, options),
+				Result::Invalid(invalid) => {
+					invalid.print_line(id, options);
+					invalids.push(invalid);
+				}
+			};
+
 		}
 
-		cprintln!("\n<cyan>End</cyan>\n");
+		cprintln!("<cyan>Creating changeset...</cyan>");
 
-	}
+		let mut pending_changes: Vec<MetaData> = Vec::new();
 
-	fn validate_and_update_metadata_file(file: &DirEntry, options: &ValidateOptions) -> std::result::Result<Result, Box<dyn Error>> {
-
-		let validation_result = Validate::validate_file(file, options)?;
-
-		match validation_result {
-			Result::Valid { .. } => {}
-			Result::Invalid(ref invalid) => {
-				if !options.dry_run {
-					Self::update_metdata_file(file, options, invalid)?
+		for invalid in invalids.iter() {
+			
+			let metadata = match invalid {
+				Invalid::MissingMetadata => {
+					MetaData::new(Uuid::new_v4()).with_file_hash(Crypto::sha256(file)?)
+				},
+				Invalid::MissingMetadataHistory { metadata } | Invalid::FileModified { metadata } => {
+					metadata.with_file_hash(Crypto::sha256(file)?)
+				},
+				Invalid::HashMismatch { metadata, file_hash } => {
+					metadata.with_file_hash(file_hash.clone()) // TODO: Do not deal with these ones!!! Create a third state -> Corrupted....
 				}
-			}
-		};
+			};
 
-		Ok(validation_result)
+			pending_changes.push(metadata);
+
+		}
+
+		cprintln!("<cyan>Changesets:</cyan>");
+
+		for metadata in pending_changes.iter() {
+			Self::print_changeset(metadata);
+		} 
+
+		//if !options.dry_run {
+			//	Self::update_metdata_file(file, options, invalid)?
+			//}
+
+		//
+
+		Ok(true)
 
 	}
 
@@ -211,6 +234,26 @@ impl Invalid {
 			Invalid::FileModified { .. } => "file modified",
 			Invalid::HashMismatch { .. } => "hash mismatch",
 		}
+	}
+
+}
+
+impl Validate {
+	
+	fn print_changeset(metadata: &MetaData) {
+		let new = metadata.last_file_hash().unwrap();
+		let old = metadata.previous_file_hash();
+
+		let (old_file_name, old_last_modified_time, old_file_size, old_sha256) = match old {
+			Some(old) => (old.file_name.as_ref(), old.last_modified_time.to_string(), old.file_size.to_string(), old.sha256.as_ref()),
+			None => ("".into(), "".into(), "".into(), "".into()),
+		};
+
+		cprintln!("<red>{}</red> -> <green>{}</green>", old_file_name, new.file_name);
+		cprintln!("<red>{}</red> -> <green>{}</green>", old_last_modified_time, new.last_modified_time.to_string());
+		cprintln!("<red>{}</red> -> <green>{}</green>", old_file_size, new.file_size.to_string());
+		cprintln!("<red>{}</red> -> <green>{}</green>", old_sha256, new.sha256.to_string());
+		cprintln!("");
 	}
 
 }
