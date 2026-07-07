@@ -26,7 +26,7 @@ impl Directory {
 		Ok(files)
 	}
 
-	// Panics if can't get last_modified_time of file
+	// TODO: Panics if can't get last_modified_time of file
 	pub fn last_modified_time(file: &DirEntry) -> DateTime<Utc> {
 
 		let meta_data = file.metadata().unwrap();

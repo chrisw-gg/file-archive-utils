@@ -1,7 +1,7 @@
 use crate::asset::{Assets};
 use crate::crypto::{Crypto, FileHash};
 use crate::directory::{Directory};
-use crate::meta::{MetaData, MetadataTimestampComparison};
+use crate::meta::{MetaData};
 
 use color_print::cprintln;
 use std::error::{Error};
@@ -53,7 +53,7 @@ impl Validate {
 
 		for (id, file) in assets.file_map.iter() {
 
-			let val = Validate::validate_file(file, options)?;
+			let val = Validate::validate_file(file)?;
 
 			// val.print_line(id, options);
 
@@ -129,26 +129,18 @@ impl Validate {
 
 	}
 
-	fn validate_file(file: &DirEntry, options: &ValidateOptions) -> std::result::Result<Result, Box<dyn Error>> {
-
-		let last_modified_time = Directory::last_modified_time(file);
-
+	fn validate_file(file: &DirEntry) -> std::result::Result<Result, Box<dyn Error>> {
 		let metadata = MetaData::read(file)?;
 
 		let Some(metadata_file_hash) = metadata.last_file_hash() else {
 			return Ok(Result::Invalid(Invalid::MissingMetadataHistory { metadata: metadata }));
 		};
 
-		match MetaData::compare_timestamp(&metadata_file_hash, last_modified_time) {
-			MetadataTimestampComparison::Error => return Err("Metadata timestamp is later than file timestamp ???".into()),
-			MetadataTimestampComparison::FileModified => return Ok(Result::Invalid(Invalid::FileModified { metadata: metadata })),
-			MetadataTimestampComparison::Equal => {
-				// If we are not doing a full validation (checking contents as well as timestamp) then we can exit early
-				if !options.contents {
-					return Ok(Result::Valid(Valid::TimestampMatches));
-				}
-			}
+		if metadata_file_hash.last_modified_time != Directory::last_modified_time(file) {
+			return Err("timestamp mismatch".into());
 		}
+
+		// TODO: if metadata_file_hash.file_size != file_size
 
 		let file_hash= Crypto::sha256(file)?;
 
