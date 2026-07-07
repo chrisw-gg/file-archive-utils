@@ -13,12 +13,6 @@ pub struct MetaData {
 	history: Vec<FileHash>,
 }
 
-pub enum MetaDataError {
-	NotFound,
-	ReadError { error: String },
-	ParseError { error: String },
-}
-
 pub enum MetadataTimestampComparison {
 	Equal,
 	FileModified,
@@ -60,30 +54,10 @@ impl MetaData {
 		}
 	}
 
-	pub fn read(file: &DirEntry) -> Result<MetaData, MetaDataError> {
+	pub fn read(file: &DirEntry) -> Result<MetaData, Box<dyn Error>> {
 		let path = Self::path_for_metadata_file(file);
-
-		let file_contents = match fs::read_to_string(&path) {
-			Ok(contents) => contents,
-			Err(error) => {
-				let result = if error.kind() == std::io::ErrorKind::NotFound {
-					MetaDataError::NotFound
-				} else {
-					MetaDataError::ReadError { error: error.to_string() }
-				};
-				return Err(result)
-			}
-
-		};
-
-		let meta_data = match serde_saphyr::from_str(&file_contents) {
-			Ok(meta_data) => meta_data,
-			Err(error) => {
-				let result = MetaDataError::ParseError { error: error.to_string() };
-				return Err(result);
-			}
-		};
-
+		let file_contents = fs::read_to_string(&path)?;
+		let meta_data = serde_saphyr::from_str(&file_contents)?;
 		Ok(meta_data)
 	}
 

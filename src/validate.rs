@@ -1,7 +1,7 @@
 use crate::asset::{Assets};
 use crate::crypto::{Crypto, FileHash};
 use crate::directory::{Directory};
-use crate::meta::{MetaData, MetaDataError, MetadataTimestampComparison};
+use crate::meta::{MetaData, MetadataTimestampComparison};
 
 use color_print::cprintln;
 use std::error::{Error};
@@ -133,30 +133,7 @@ impl Validate {
 
 		let last_modified_time = Directory::last_modified_time(file);
 
-		let metadata = match MetaData::read(file) {
-			Ok(metadata) => metadata,
-			Err(metadata_error) => {
-				match metadata_error {
-					MetaDataError::NotFound => {
-						return Ok(Result::Invalid(Invalid::MissingMetadata));
-					}
-					MetaDataError::ReadError { error } => {
-						let msg = match options.log_level {
-							LogLevel::Verbose => format!("{} -> read error:\n{}", file.path().display(), error),
-							_ => format!("io error reading metadata file"),
-						};
-						return Err(msg.into());
-					}
-					MetaDataError::ParseError { error } => {
-						let msg = match options.log_level {
-							LogLevel::Verbose => format!("{} -> parse error:\n{}", file.path().display(), error),
-							_ => format!("parse error reading metadata file"),
-						};
-						return Err(msg.into());
-					}
-				}
-			}
-		};
+		let metadata = MetaData::read(file)?;
 
 		let Some(metadata_file_hash) = metadata.last_file_hash() else {
 			return Ok(Result::Invalid(Invalid::MissingMetadataHistory { metadata: metadata }));
