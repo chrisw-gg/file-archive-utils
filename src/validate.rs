@@ -89,12 +89,6 @@ impl Validate {
 
 		}
 
-		cprintln!("<cyan>Changesets:</cyan>");
-
-		for metadata in pending_changes.iter() {
-			Self::print_changeset(metadata);
-		} 
-
 		//if !options.dry_run {
 			//	Self::update_metdata_file(file, options, invalid)?
 			//}
@@ -203,26 +197,6 @@ impl Invalid {
 			Invalid::FileModified { .. } => "file modified",
 			Invalid::HashMismatch { .. } => "hash mismatch",
 		}
-	}
-
-}
-
-impl Validate {
-	
-	fn print_changeset(metadata: &MetaData) {
-		let new = metadata.last_file_hash().unwrap();
-		let old = metadata.previous_file_hash();
-
-		let (old_file_name, old_last_modified_time, old_file_size, old_sha256) = match old {
-			Some(old) => (old.file_name.as_ref(), old.last_modified_time.to_string(), old.file_size.to_string(), old.sha256.as_ref()),
-			None => ("".into(), "".into(), "".into(), "".into()),
-		};
-
-		cprintln!("<red>{}</red> -> <green>{}</green>", old_file_name, new.file_name);
-		cprintln!("<red>{}</red> -> <green>{}</green>", old_last_modified_time, new.last_modified_time.to_string());
-		cprintln!("<red>{}</red> -> <green>{}</green>", old_file_size, new.file_size.to_string());
-		cprintln!("<red>{}</red> -> <green>{}</green>", old_sha256, new.sha256.to_string());
-		cprintln!("");
 	}
 
 }
