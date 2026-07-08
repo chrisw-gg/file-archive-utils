@@ -1,35 +1,19 @@
-use crate::crypto::{FileHash};
-
+use chrono::{DateTime, Utc};
 use std::error::{Error};
 use std::fs::{self, DirEntry};
 use std::path::{PathBuf};
 use serde::{Serialize, Deserialize};
-use uuid::{Uuid};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MetaData {
-	id: String,
-	history: Vec<FileHash>,
+	pub id: String,
+	pub file_name: String,
+	pub last_modified_time: DateTime<Utc>,
+	pub file_size: u64,
+	pub sha256: String,
 }
 
 impl MetaData {
-
-	pub fn new(id: Uuid) -> MetaData {
-		MetaData {
-			id: id.into(),
-			history: Vec::new(),
-		}
-	}
-
-	pub fn last_file_hash(&self) -> Option<&FileHash> {
-		self.history.last()
-	}
-
-	pub fn with_file_hash(&self, file_hash: FileHash) -> Self {
-		let mut clone = self.clone();
-		clone.history.push(file_hash);
-		clone
-	}
 
 	pub fn read(file: &DirEntry) -> Result<MetaData, Box<dyn Error>> {
 		let path = Self::path_for_metadata_file(file);
