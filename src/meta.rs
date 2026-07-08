@@ -4,7 +4,6 @@ use chrono::{DateTime, Utc};
 use indicatif::{ProgressBar, ProgressStyle};
 use serde::{Serialize, Deserialize};
 use std::error::{Error};
-use std::ffi::OsString;
 use std::fs::{self, DirEntry, File};
 use std::path::{PathBuf};
 use uuid::Uuid;
@@ -12,7 +11,7 @@ use uuid::Uuid;
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ExpectedMetadata {
 	pub id: String,
-	pub file_name: OsString,
+	pub file_name: String,
 	pub last_modified_time: DateTime<Utc>,
 	pub file_size: u64,
 	pub sha256: String,
@@ -20,7 +19,7 @@ pub struct ExpectedMetadata {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ActualMetadata {
-	pub file_name: OsString,
+	pub file_name: String,
 	pub last_modified_time: DateTime<Utc>,
 	pub file_size: u64,
 	pub sha256: Option<String>,
@@ -69,7 +68,7 @@ impl ActualMetadata {
 		file.lock()?;
 		
 		let mut actual_metadata = ActualMetadata {
-			file_name: dir_entry.file_name(),
+			file_name: dir_entry.file_name().to_string_lossy().into(),
 			last_modified_time: dir_entry.metadata()?.modified()?.into(),
 			file_size: dir_entry.metadata()?.len(),
 			sha256: None,

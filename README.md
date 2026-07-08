@@ -4,8 +4,9 @@
 cargo install --git https://github.com/chrisw-gg/file-archive-utils
 
 ### usage:
-~/.cargo/bin/file-archive-utils
+~/.cargo/bin/file-archive-utils validate ./test/ --verbose --quick
+~/.cargo/bin/file-archive-utils update ./test/ --verbose
 
-### build and run locally:
-cargo run validate ./test/
-cargo run update ./test/
+### local usage:
+cargo run validate ./test/ --verbose --quick
+cargo run update ./test/ --verbose
