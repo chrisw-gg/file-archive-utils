@@ -4,6 +4,7 @@ use crate::meta::{ActualMetadata, ExpectedMetadata};
 use color_print::cprintln;
 use std::error::{Error};
 use std::fs::{DirEntry};
+use std::path::{PathBuf};
 use std::result::Result;
 
 #[derive(Debug)]
@@ -20,7 +21,7 @@ pub enum LogLevel {
 }
 
 pub enum ValidationResult {
-	Good,
+	Success,
 	MetadataMissing,
 	Error(Box<dyn Error>)
 }
@@ -29,18 +30,74 @@ pub struct Validate {
 
 }
 
+pub struct Stats {
+	success: u32,
+	missing: u32,
+	updated: u32,
+	errors: u32,
+}
+
 impl Validate {
 
-	pub fn validate_and_update_metadata(assets: &Assets, options: &ValidateOptions) -> Result<bool, Box<dyn Error>> {
+	pub fn validate_assets(directory: &PathBuf, options: &ValidateOptions) -> Result<bool, Box<dyn Error>> {
 
-		cprintln!("<cyan>Validating files...</cyan>");
+		let assets = Assets::new(&directory)?;
+
+		cprintln!("<cyan>Validating files [0/{}] ...</cyan>\n", assets.file_map.len());
+
+		let mut stats = Stats::init();
 
 		for (_id, dir_entry) in assets.file_map.iter() {
 
 			let result = Self::validate_file(dir_entry, options);
 
 			match result {
-				ValidationResult::Good => {
+				ValidationResult::Success => {
+					stats.success += 1;
+					if matches!(options.log_level, LogLevel::Verbose) {
+						cprintln!("<green>{:#?} ✓</green>", dir_entry.file_name())
+					}
+				},
+				ValidationResult::Error(err) => {
+					stats.errors += 1;
+					match options.log_level {
+						LogLevel::Default => cprintln!("<red>{:#?} X</red>", dir_entry.file_name()),
+						LogLevel::Verbose => cprintln!("<red>{:#?} failed: {}</red>", dir_entry.file_name(), err),
+					}
+				}
+				ValidationResult::MetadataMissing => {
+					stats.missing += 1;
+					if matches!(options.log_level, LogLevel::Verbose) {
+						cprintln!("<yellow>{:#?} ?</yellow>", dir_entry.file_name())
+					}
+				},
+			}
+
+		}
+
+		cprintln!("\n");
+		cprintln!("<cyan>Validated {} files:</cyan>", assets.file_map.len());
+		cprintln!("<green>Success {}</green>", stats.success);
+		cprintln!("<yellow>Missing {}</yellow>", stats.missing);
+		cprintln!("<red>Errors {}</red>", stats.errors);
+		cprintln!("\n");
+
+		Ok(true)
+
+	}
+
+	pub fn update_assets(directory: &PathBuf, options: &ValidateOptions) -> Result<bool, Box<dyn Error>> {
+
+		let assets = Assets::new(&directory)?;
+
+		cprintln!("<cyan>Validating files [0/{}]...</cyan>", assets.file_map.len());
+
+		for (_id, dir_entry) in assets.file_map.iter() {
+
+			let result = Self::validate_file(dir_entry, options);
+
+			match result {
+				ValidationResult::Success => {
 					if matches!(options.log_level, LogLevel::Verbose) {
 						cprintln!("<green>{:#?} ✓</green>", dir_entry.file_name())
 					}
@@ -106,9 +163,19 @@ impl Validate {
 			}
 		}
 
-		// TODO: Return "✓ hash ✓ timestamp" maybe
-		Ok(ValidationResult::Good)
+		Ok(ValidationResult::Success)
 
 	}
 
+}
+
+impl Stats {
+	pub fn init() -> Self {
+		Stats {
+			success: 0,
+			missing: 0,
+			updated: 0,
+			errors: 0,
+		}
+	}
 }

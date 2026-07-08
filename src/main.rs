@@ -4,11 +4,10 @@ mod directory;
 mod meta;
 mod validate;
 
+use validate::{LogLevel, Validate, ValidateOptions};
+
 use clap::{Args, Parser, Subcommand};
 use std::path::{PathBuf};
-
-use asset::{Assets};
-use validate::{LogLevel, Validate, ValidateOptions};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -70,10 +69,8 @@ fn main() {
 		Commands::Update(ref args) => &args.directory,
 	};
 
-	println!("{:?}", options);
+	println!("Options = {:?}", options);
 	
-	let assets = Assets::new(&directory).unwrap();
-
-	Validate::validate_and_update_metadata(&assets, &options).unwrap();
+	Validate::validate_assets(&directory, &options).unwrap();
 	
 }
