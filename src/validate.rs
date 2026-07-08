@@ -22,7 +22,7 @@ pub enum LogLevel {
 pub enum ValidationResult {
 	Good,
 	MetadataMissing,
-	// Error
+	Error(Box<dyn Error>)
 }
 
 pub struct Validate {
@@ -39,23 +39,18 @@ impl Validate {
 
 			let result = Self::validate_file(dir_entry, options);
 
-			let val = match result {
-				Ok(val) => val,
-				Err(err) => {
-					match options.log_level {
-						LogLevel::Default => cprintln!("<red>{:#?} X</red>", dir_entry.file_name()),
-						LogLevel::Verbose => cprintln!("<red>{:#?} failed: {}</red>", dir_entry.file_name(), err),
-					}
-					continue
-				}
-			};
-
-			match val {
+			match result {
 				ValidationResult::Good => {
 					if matches!(options.log_level, LogLevel::Verbose) {
 						cprintln!("<green>{:#?} ✓</green>", dir_entry.file_name())
 					}
 				},
+				ValidationResult::Error(err) => {
+					match options.log_level {
+						LogLevel::Default => cprintln!("<red>{:#?} X</red>", dir_entry.file_name()),
+						LogLevel::Verbose => cprintln!("<red>{:#?} failed: {}</red>", dir_entry.file_name(), err),
+					}
+				}
 				ValidationResult::MetadataMissing => {
 					let actual = ActualMetadata::fetch(dir_entry, true)?;
 					let expected = ActualMetadata::to_expected(actual)?;
@@ -67,7 +62,7 @@ impl Validate {
 					if matches!(options.log_level, LogLevel::Verbose) {
 						cprintln!("{:#?}", expected)
 					}
-				}
+				},
 			}
 
 		}
@@ -79,7 +74,15 @@ impl Validate {
 
 	}
 
-	fn validate_file(dir_entry: &DirEntry, options: &ValidateOptions) -> Result<ValidationResult, Box<dyn Error>> {
+	fn validate_file(dir_entry: &DirEntry, options: &ValidateOptions) -> ValidationResult {
+		let result = Self::validate_file_wrapped(dir_entry, options);
+		match result {
+			Ok(result) => result,
+			Err(err) => ValidationResult::Error(err),
+		}
+	}
+
+	fn validate_file_wrapped(dir_entry: &DirEntry, options: &ValidateOptions) -> Result<ValidationResult, Box<dyn Error>> {
 
 		let expected = match ExpectedMetadata::fetch(dir_entry)? {
 			Some(expected) => expected,
@@ -108,33 +111,4 @@ impl Validate {
 
 	}
 
-	/*
-	fn create_metadata_file(direntry: &DirEntry) -> Result<MetaData, Box<dyn Error>> {
-		let mut file = File::open(direntry.path())?;
-
-		file.lock()?;
-
-		let pb: ProgressBar = ProgressBar::new(file_size);
-		pb.set_style(ProgressStyle::with_template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})").unwrap()
-		.progress_chars("#>-"));
-		
-		let (sha256, bytes_read) = Crypto::stream_sha256(&mut file, &pb)?;
-
-		let metadata = MetaData {
-			id: Uuid::new_v4().into(),
-			file_name: file_name.to_string_lossy().to_string(),
-			last_modified_time: meta_data.modified()?,
-			file_size: metadata.len(),
-			sha256: sha256,
-		};
-
-		if file_size != bytes_read {
-			return Err("Bytes read incorrect".into());
-		}
-
-		pb.finish_and_clear();
-
-		Ok(metadata)
-	}
-	*/
 }

@@ -1,8 +1,8 @@
 use indicatif::{ProgressBar};
+use sha2::{Sha256, Digest};
 use std::convert::TryInto;
 use std::fs::{File};
 use std::error::Error;
-use sha2::{Sha256, Digest};
 use std::io::{Read};
 
 pub struct Crypto {
