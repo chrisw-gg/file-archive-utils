@@ -31,10 +31,10 @@ pub struct Validate {
 }
 
 pub struct Stats {
-	success: u32,
-	missing: u32,
-	updated: u32,
-	errors: u32,
+	total: usize,
+	success: usize,
+	missing: usize,
+	errors: usize,
 }
 
 impl Validate {
@@ -42,14 +42,14 @@ impl Validate {
 	pub fn validate_assets(directory: &PathBuf, options: &ValidateOptions) -> Result<bool, Box<dyn Error>> {
 
 		let assets = Assets::new(&directory)?;
+		let mut stats = Stats::init(assets.file_map.len());
 
-		cprintln!("<cyan>Validating files [0/{}] ...</cyan>\n", assets.file_map.len());
+		cprintln!("<cyan>Validating files [0/{}] ...</cyan>\n", stats.total);
 
-		let mut stats = Stats::init();
 
 		for (_id, dir_entry) in assets.file_map.iter() {
 
-			let result = Self::validate_file(dir_entry, options);
+			let result = Self::validate_file(dir_entry, options.contents);
 
 			match result {
 				ValidationResult::Success => {
@@ -75,12 +75,12 @@ impl Validate {
 
 		}
 
-		cprintln!("\n");
-		cprintln!("<cyan>Validated {} files:</cyan>", assets.file_map.len());
-		cprintln!("<green>Success {}</green>", stats.success);
-		cprintln!("<yellow>Missing {}</yellow>", stats.missing);
-		cprintln!("<red>Errors {}</red>", stats.errors);
-		cprintln!("\n");
+		cprintln!("");
+		cprintln!("<cyan>Validated [{}/{}] files ...</cyan>", stats.total, stats.total);
+		cprintln!("<green>  Success {}</green>", stats.success);
+		cprintln!("<yellow>  Missing {}</yellow>", stats.missing);
+		cprintln!("<red>  Errors {}</red>", stats.errors);
+		cprintln!("");
 
 		Ok(true)
 
@@ -88,65 +88,61 @@ impl Validate {
 
 	pub fn update_assets(directory: &PathBuf, options: &ValidateOptions) -> Result<bool, Box<dyn Error>> {
 
-		let assets = Assets::new(&directory)?;
+		let missing = Assets::new(&directory)?.missing();
+		let mut stats = Stats::init(missing.len());
 
-		cprintln!("<cyan>Validating files [0/{}]...</cyan>", assets.file_map.len());
+		cprintln!("<cyan>Updating files [0/{}]...</cyan>", stats.total);
 
-		for (_id, dir_entry) in assets.file_map.iter() {
+		for (_id, dir_entry) in missing.iter() {
 
-			let result = Self::validate_file(dir_entry, options);
+			let result = Self::update_file(dir_entry, options.dry_run);
 
 			match result {
-				ValidationResult::Success => {
+				Ok(expected) => {
+					stats.success += 1;
 					if matches!(options.log_level, LogLevel::Verbose) {
-						cprintln!("<green>{:#?} ✓</green>", dir_entry.file_name())
+						cprintln!("<green>{:#?} ✓</green>", dir_entry.file_name());
+						// TODO: Maybe have another log level where we don't print expected...
+						cprintln!("{:#?}", expected)
 					}
 				},
-				ValidationResult::Error(err) => {
+				Err(err) => {
+					stats.errors += 1;
 					match options.log_level {
 						LogLevel::Default => cprintln!("<red>{:#?} X</red>", dir_entry.file_name()),
 						LogLevel::Verbose => cprintln!("<red>{:#?} failed: {}</red>", dir_entry.file_name(), err),
 					}
 				}
-				ValidationResult::MetadataMissing => {
-					let actual = ActualMetadata::fetch(dir_entry, true)?;
-					let expected = ActualMetadata::to_expected(actual)?;
-
-					if !options.dry_run {
-						ExpectedMetadata::write(dir_entry, &expected)?;
-					}
-
-					if matches!(options.log_level, LogLevel::Verbose) {
-						cprintln!("{:#?}", expected)
-					}
-				},
 			}
 
 		}
 
-		// List statistics, good, bad, missing...
-		cprintln!("<cyan>Validated [0/x] files...</cyan>");
+		cprintln!("");
+		cprintln!("<cyan>Updated [{}/{}] files ...</cyan>", stats.total, stats.total);
+		cprintln!("<green>  Success {}</green>", stats.success);
+		cprintln!("<red>  Errors {}</red>", stats.errors);
+		cprintln!("");
 
 		Ok(true)
 
 	}
 
-	fn validate_file(dir_entry: &DirEntry, options: &ValidateOptions) -> ValidationResult {
-		let result = Self::validate_file_wrapped(dir_entry, options);
+	fn validate_file(dir_entry: &DirEntry, use_checksum: bool) -> ValidationResult {
+		let result = Self::validate_file_wrapped(dir_entry, use_checksum);
 		match result {
 			Ok(result) => result,
 			Err(err) => ValidationResult::Error(err),
 		}
 	}
 
-	fn validate_file_wrapped(dir_entry: &DirEntry, options: &ValidateOptions) -> Result<ValidationResult, Box<dyn Error>> {
+	fn validate_file_wrapped(dir_entry: &DirEntry, use_checksum: bool) -> Result<ValidationResult, Box<dyn Error>> {
 
 		let expected = match ExpectedMetadata::fetch(dir_entry)? {
 			Some(expected) => expected,
 			None => return Ok(ValidationResult::MetadataMissing)
 		};
 
-		let actual = ActualMetadata::fetch(dir_entry, options.contents)?;
+		let actual = ActualMetadata::fetch(dir_entry, use_checksum)?;
 
 		if actual.last_modified_time != expected.last_modified_time {
 			return Err("last_modified_time mismatch".into());
@@ -156,7 +152,7 @@ impl Validate {
 			return Err("file_size mismatch".into());
 		}
 
-		if options.contents {
+		if use_checksum {
 			let actual_sha256 = actual.sha256.ok_or("sha256 not calculated???")?;
 			if actual_sha256 != expected.sha256 {
 				return Err(format!("sha256 mismatch expected: {}, actual: {}", actual_sha256, expected.sha256).into());
@@ -167,14 +163,25 @@ impl Validate {
 
 	}
 
+	fn update_file(dir_entry: &DirEntry, dry_run: bool) -> Result<ExpectedMetadata, Box<dyn Error>> {
+		let actual = ActualMetadata::fetch(dir_entry, true)?;
+		let expected = ActualMetadata::to_expected(actual)?;
+
+		if !dry_run {
+			ExpectedMetadata::write(dir_entry, &expected)?;
+		}
+
+		Ok(expected)
+	}
+
 }
 
 impl Stats {
-	pub fn init() -> Self {
+	pub fn init(total: usize) -> Self {
 		Stats {
+			total: total,
 			success: 0,
 			missing: 0,
-			updated: 0,
 			errors: 0,
 		}
 	}

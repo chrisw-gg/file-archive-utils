@@ -71,6 +71,9 @@ fn main() {
 
 	println!("Options = {:?}", options);
 	
-	Validate::validate_assets(&directory, &options).unwrap();
+	match args.command {
+		Commands::Validate(..) => Validate::validate_assets(&directory, &options).unwrap(),
+		Commands::Update(..) => Validate::update_assets(&directory, &options).unwrap(),
+	};
 	
 }

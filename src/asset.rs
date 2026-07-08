@@ -43,4 +43,16 @@ impl Assets {
 		
 	}
 
+	pub fn missing(self) -> HashMap<PathBuf, DirEntry> {
+		let mut missing: HashMap<PathBuf, DirEntry> = HashMap::new();
+
+		for (path, dir_entry) in self.file_map {
+			if !self.meta_map.contains_key(&path) {
+				missing.insert(path, dir_entry);
+			}
+		}
+
+		missing
+	}
+
 }
