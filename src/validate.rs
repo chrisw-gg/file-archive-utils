@@ -1,13 +1,10 @@
 use crate::asset::{Assets};
-use crate::crypto::{Crypto};
-use crate::directory::{Directory};
-use crate::meta::{MetaData};
+use crate::meta::{ActualMetadata, ExpectedMetadata};
 
 use color_print::cprintln;
 use std::error::{Error};
 use std::fs::{DirEntry};
-use std::path::{PathBuf};
-// use uuid::{Uuid};
+use std::result::Result;
 
 #[derive(Debug)]
 pub struct ValidateOptions {
@@ -22,97 +19,122 @@ pub enum LogLevel {
 	Verbose,
 }
 
+pub enum ValidationResult {
+	Good,
+	MetadataMissing,
+	// Error
+}
+
 pub struct Validate {
 
 }
 
-enum Result {
-	Valid(Valid),
-}
-
-enum Valid {
-	TimestampMatches,
-	HashAndTimestampMatches,
-}
-
 impl Validate {
 
-	pub fn validate_and_update_metadata(assets: &Assets, options: &ValidateOptions) -> std::result::Result<bool, Box<dyn Error>> {
+	pub fn validate_and_update_metadata(assets: &Assets, options: &ValidateOptions) -> Result<bool, Box<dyn Error>> {
 
 		cprintln!("<cyan>Validating files...</cyan>");
 
-		for (id, file) in assets.file_map.iter() {
+		for (_id, dir_entry) in assets.file_map.iter() {
 
-			let val = Validate::validate_file(file)?;
+			let result = Self::validate_file(dir_entry, options);
 
-			// val.print_line(id, options);
+			let val = match result {
+				Ok(val) => val,
+				Err(err) => {
+					match options.log_level {
+						LogLevel::Default => cprintln!("<red>{:#?} X</red>", dir_entry.file_name()),
+						LogLevel::Verbose => cprintln!("<red>{:#?} failed: {}</red>", dir_entry.file_name(), err),
+					}
+					continue
+				}
+			};
 
 			match val {
-				Result::Valid(valid) => valid.print_line(id, options),
-			};
+				ValidationResult::Good => {
+					if matches!(options.log_level, LogLevel::Verbose) {
+						cprintln!("<green>{:#?} ✓</green>", dir_entry.file_name())
+					}
+				},
+				ValidationResult::MetadataMissing => {
+					let actual = ActualMetadata::fetch(dir_entry, true)?;
+					let expected = ActualMetadata::to_expected(actual)?;
+
+					if !options.dry_run {
+						ExpectedMetadata::write(dir_entry, &expected)?;
+					}
+
+					if matches!(options.log_level, LogLevel::Verbose) {
+						cprintln!("{:#?}", expected)
+					}
+				}
+			}
 
 		}
 
-		//if !options.dry_run {
-			//	Self::update_metdata_file(file, options, invalid)?
-			//}
-
-		//
+		// List statistics, good, bad, missing...
+		cprintln!("<cyan>Validated [0/x] files...</cyan>");
 
 		Ok(true)
 
 	}
 
-	fn validate_file(file: &DirEntry) -> std::result::Result<Result, Box<dyn Error>> {
-		// TODO: Return optional metadata... because it may not exist and that is not an error...
-		let metadata = MetaData::read(file)?;
+	fn validate_file(dir_entry: &DirEntry, options: &ValidateOptions) -> Result<ValidationResult, Box<dyn Error>> {
 
-		if metadata.last_modified_time != Directory::last_modified_time(file) {
-			return Err("timestamp mismatch".into());
+		let expected = match ExpectedMetadata::fetch(dir_entry)? {
+			Some(expected) => expected,
+			None => return Ok(ValidationResult::MetadataMissing)
+		};
+
+		let actual = ActualMetadata::fetch(dir_entry, options.contents)?;
+
+		if actual.last_modified_time != expected.last_modified_time {
+			return Err("last_modified_time mismatch".into());
 		}
 
-		// TODO: if metadata_file_hash.file_size != file_size
-
-		// TODO: Don't necessarily want to hash the file for quick checks...pass in options
-		let file_hash= Crypto::sha256(file)?;
-
-		if metadata.sha256 != file_hash.sha256 {
-			return Err(format!("sha256 mismatch expected: {}, actual: {}", metadata.sha256, file_hash.sha256).into());
+		if actual.file_size != expected.file_size {
+			return Err("file_size mismatch".into());
 		}
 
-		let result = Result::Valid(Valid::HashAndTimestampMatches);
-		Ok(result)
+		if options.contents {
+			let actual_sha256 = actual.sha256.ok_or("sha256 not calculated???")?;
+			if actual_sha256 != expected.sha256 {
+				return Err(format!("sha256 mismatch expected: {}, actual: {}", actual_sha256, expected.sha256).into());
+			}
+		}
+
+		// TODO: Return "✓ hash ✓ timestamp" maybe
+		Ok(ValidationResult::Good)
 
 	}
 
-}
+	/*
+	fn create_metadata_file(direntry: &DirEntry) -> Result<MetaData, Box<dyn Error>> {
+		let mut file = File::open(direntry.path())?;
 
-impl Result {
+		file.lock()?;
 
-	fn print_line(&self, id: &PathBuf, options: &ValidateOptions) {
+		let pb: ProgressBar = ProgressBar::new(file_size);
+		pb.set_style(ProgressStyle::with_template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})").unwrap()
+		.progress_chars("#>-"));
+		
+		let (sha256, bytes_read) = Crypto::stream_sha256(&mut file, &pb)?;
 
-		match self {
-			Result::Valid(valid) => valid.print_line(id, options),
+		let metadata = MetaData {
+			id: Uuid::new_v4().into(),
+			file_name: file_name.to_string_lossy().to_string(),
+			last_modified_time: meta_data.modified()?,
+			file_size: metadata.len(),
+			sha256: sha256,
+		};
+
+		if file_size != bytes_read {
+			return Err("Bytes read incorrect".into());
 		}
 
+		pb.finish_and_clear();
+
+		Ok(metadata)
 	}
-
-}
-
-impl Valid {
-
-	fn print_line(&self, id: &PathBuf, options: &ValidateOptions) {
-		match options.log_level {
-			LogLevel::Verbose => cprintln!("<green>{} -> {}</green>", id.to_string_lossy(), self.to_string()),
-			_ => return // Print nothing if not verbose
-		}
-	}
-
-	fn to_string(&self) -> &str {
-		match self {
-			Valid::TimestampMatches => "✓ timestamp",
-			Valid::HashAndTimestampMatches => "✓ hash ✓ timestamp",
-		}
-	}
-
+	*/
 }

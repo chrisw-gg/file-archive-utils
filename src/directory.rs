@@ -1,4 +1,3 @@
-use chrono::{DateTime, Utc};
 use std::error::{Error};
 use std::fs::{self, DirEntry};
 use std::path::{Path};
@@ -24,17 +23,6 @@ impl Directory {
 		let files = std::mem::take(&mut iter.files);
 
 		Ok(files)
-	}
-
-	// TODO: Panics if can't get last_modified_time of file
-	pub fn last_modified_time(file: &DirEntry) -> DateTime<Utc> {
-
-		let meta_data = file.metadata().unwrap();
-		let modified = meta_data.modified().unwrap();
-
-		let last_modified_time: DateTime<Utc> = modified.into();
-
-		return last_modified_time;
 	}
 
 }

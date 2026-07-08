@@ -13,9 +13,6 @@ use validate::{LogLevel, Validate, ValidateOptions};
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Cli {
-	#[arg(long, default_value_t = false)]
-	verbose: bool,
-
 	#[command(subcommand)]
 	command: Commands,
 }
@@ -31,6 +28,9 @@ struct ValidateArgs {
 	#[arg(long, default_value_t = false)]
 	quick: bool,
 
+	#[arg(long, default_value_t = false)]
+	verbose: bool,
+
 	#[arg(default_value = ".")]
 	directory: PathBuf,
 }
@@ -39,6 +39,9 @@ struct ValidateArgs {
 struct UpdateArgs {
 	#[arg(long, default_value_t = false)]
 	quick: bool,
+
+	#[arg(long, default_value_t = false)]
+	verbose: bool,
 
 	#[arg(default_value = ".")]
 	directory: PathBuf,
@@ -56,7 +59,10 @@ fn main() {
 			Commands::Validate(..) => true,
 			Commands::Update(..) => false,
 		},
-		log_level: if args.verbose { LogLevel::Verbose } else { LogLevel::Default }
+		log_level: match args.command {
+			Commands::Validate(ref args) => if args.verbose { LogLevel::Verbose } else { LogLevel::Default },
+			Commands::Update(ref args) => if args.verbose { LogLevel::Verbose } else { LogLevel::Default },
+		}
 	};
 
 	let directory = match args.command {
@@ -68,6 +74,6 @@ fn main() {
 	
 	let assets = Assets::new(&directory).unwrap();
 
-	Validate::validate_and_update_metadata(&assets, &options);
+	Validate::validate_and_update_metadata(&assets, &options).unwrap();
 	
 }
