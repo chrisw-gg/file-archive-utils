@@ -65,7 +65,7 @@ impl ActualMetadata {
 	pub fn fetch(dir_entry: &DirEntry, include_checksum: bool) -> Result<ActualMetadata, Box<dyn Error>> {
 		let mut file = File::open(dir_entry.path())?;
 
-		file.lock()?;
+		file.try_lock_shared()?;
 		
 		let mut actual_metadata = ActualMetadata {
 			file_name: dir_entry.file_name().to_string_lossy().into(),
