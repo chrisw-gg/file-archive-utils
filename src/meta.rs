@@ -78,6 +78,7 @@ impl ActualMetadata {
 			let pb: ProgressBar = ProgressBar::new(actual_metadata.file_size);
 			pb.set_style(ProgressStyle::with_template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})").unwrap()
 			.progress_chars("#>-"));
+			pb.tick();
 
 			let (sha256, _bytes_read) = Crypto::stream_sha256(&mut file, &pb)?;
 			// TODO: Check bytes_read?
