@@ -28,7 +28,7 @@ pub struct ActualMetadata {
 impl ExpectedMetadata {
 
 	pub fn fetch(file: &DirEntry) -> Result<Option<ExpectedMetadata>, Box<dyn Error>> {
-		let path = Self::path_for_metadata_file(file);
+		let path = Self::path_for_metadata_file(file)?;
 
 		let file_contents = match fs::read_to_string(&path) {
 			Ok(contents) => contents,
@@ -46,7 +46,12 @@ impl ExpectedMetadata {
 	}
 
 	pub fn write(file: &DirEntry, meta_data: &ExpectedMetadata) -> Result<(), Box<dyn Error>> {
-		let path = Self::path_for_metadata_file(file);
+		let path = Self::path_for_metadata_file(file)?;
+		let parent = path.parent().ok_or("No parent")?;
+
+		if !fs::exists(parent)? {
+			fs::create_dir(parent)?;
+		}
 
 		let yaml = serde_saphyr::to_string(&meta_data)?;
 		fs::write(path, yaml)?;
@@ -54,8 +59,13 @@ impl ExpectedMetadata {
 		Ok(())
 	}
 
-	fn path_for_metadata_file(file: &DirEntry) -> PathBuf {
-		file.path().with_added_extension("meta")
+	// test/foo.jpg -> test/.metadata/foo.jpg.meta
+	fn path_for_metadata_file(file: &DirEntry) -> Result<PathBuf, Box<dyn Error>> {
+		let file_path = file.path();
+		let parent = file_path.parent().ok_or("No parent")?;
+		let file_name = file_path.file_name().ok_or("No filename")?;
+		let metadata_path = parent.join(".metadata").join(file_name).with_added_extension("meta");
+		Ok(metadata_path)
 	}
 
 }
