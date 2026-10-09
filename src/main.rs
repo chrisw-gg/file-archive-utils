@@ -24,6 +24,9 @@ enum Commands {
 
 #[derive(Args, Debug)]
 struct ValidateArgs {
+	#[arg(long, num_args=1)]
+	inline: bool,
+
 	#[arg(long, default_value_t = false)]
 	quick: bool,
 
@@ -36,6 +39,9 @@ struct ValidateArgs {
 
 #[derive(Args, Debug)]
 struct UpdateArgs {
+	#[arg(long, num_args=1)]
+	inline: bool,
+
 	#[arg(long, default_value_t = false)]
 	quick: bool,
 
@@ -50,6 +56,10 @@ fn main() {
 	let args = Cli::parse();
 
 	let options = ValidateOptions {
+		inline: match args.command {
+			Commands::Validate(ref args) => args.inline,
+			Commands::Update(ref args) => args.inline,
+		},
 		contents: match args.command {
 			Commands::Validate(ref args) => !args.quick,
 			Commands::Update(ref args) => !args.quick,

@@ -1,4 +1,5 @@
 use crate::crypto::Crypto;
+use crate::validate::ValidateOptions;
 
 use chrono::{DateTime, Utc};
 use indicatif::{ProgressBar, ProgressStyle};
@@ -27,8 +28,8 @@ pub struct ActualMetadata {
 
 impl ExpectedMetadata {
 
-	pub fn fetch(file: &DirEntry) -> Result<Option<ExpectedMetadata>, Box<dyn Error>> {
-		let path = Self::path_for_metadata_file(file)?;
+	pub fn fetch(file: &DirEntry, options: &ValidateOptions) -> Result<Option<ExpectedMetadata>, Box<dyn Error>> {
+		let path = Self::path_for_metadata_file(file, options)?;
 
 		let file_contents = match fs::read_to_string(&path) {
 			Ok(contents) => contents,
@@ -45,8 +46,8 @@ impl ExpectedMetadata {
 		Ok(Some(meta_data))
 	}
 
-	pub fn write(file: &DirEntry, meta_data: &ExpectedMetadata) -> Result<(), Box<dyn Error>> {
-		let path = Self::path_for_metadata_file(file)?;
+	pub fn write(file: &DirEntry, meta_data: &ExpectedMetadata, options: &ValidateOptions) -> Result<(), Box<dyn Error>> {
+		let path = Self::path_for_metadata_file(file, options)?;
 		let parent = path.parent().ok_or("No parent")?;
 
 		if !fs::exists(parent)? {
@@ -59,8 +60,13 @@ impl ExpectedMetadata {
 		Ok(())
 	}
 
+	// test/foo.jpg -> test/foo.jpg.meta (inline)
 	// test/foo.jpg -> test/.metadata/foo.jpg.meta
-	fn path_for_metadata_file(file: &DirEntry) -> Result<PathBuf, Box<dyn Error>> {
+	fn path_for_metadata_file(file: &DirEntry, options: &ValidateOptions) -> Result<PathBuf, Box<dyn Error>> {
+		if options.inline {
+			return Ok(file.path().with_added_extension("meta"))
+		}
+
 		let file_path = file.path();
 		let parent = file_path.parent().ok_or("No parent")?;
 		let file_name = file_path.file_name().ok_or("No filename")?;

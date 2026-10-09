@@ -9,6 +9,7 @@ use std::result::Result;
 
 #[derive(Debug)]
 pub struct ValidateOptions {
+	pub inline: bool,
 	pub contents: bool,
 	pub dry_run: bool,
 	pub log_level: LogLevel,
@@ -49,7 +50,7 @@ impl Validate {
 
 		for (_id, dir_entry) in assets.file_map.iter() {
 
-			let result = Self::validate_file(dir_entry, options.contents);
+			let result = Self::validate_file(dir_entry, options);
 
 			match result {
 				ValidationResult::Success => {
@@ -95,7 +96,7 @@ impl Validate {
 
 		for (_id, dir_entry) in missing.iter() {
 
-			let result = Self::update_file(dir_entry, options.dry_run);
+			let result = Self::update_file(dir_entry, options);
 
 			match result {
 				Ok(expected) => {
@@ -127,17 +128,19 @@ impl Validate {
 
 	}
 
-	fn validate_file(dir_entry: &DirEntry, use_checksum: bool) -> ValidationResult {
-		let result = Self::validate_file_wrapped(dir_entry, use_checksum);
+	fn validate_file(dir_entry: &DirEntry, options: &ValidateOptions) -> ValidationResult {
+		let result = Self::validate_file_wrapped(dir_entry, options);
 		match result {
 			Ok(result) => result,
 			Err(err) => ValidationResult::Error(err),
 		}
 	}
 
-	fn validate_file_wrapped(dir_entry: &DirEntry, use_checksum: bool) -> Result<ValidationResult, Box<dyn Error>> {
+	fn validate_file_wrapped(dir_entry: &DirEntry, options: &ValidateOptions) -> Result<ValidationResult, Box<dyn Error>> {
 
-		let expected = match ExpectedMetadata::fetch(dir_entry)? {
+		let use_checksum = options.contents;
+
+		let expected = match ExpectedMetadata::fetch(dir_entry, options)? {
 			Some(expected) => expected,
 			None => return Ok(ValidationResult::MetadataMissing)
 		};
@@ -163,12 +166,12 @@ impl Validate {
 
 	}
 
-	fn update_file(dir_entry: &DirEntry, dry_run: bool) -> Result<ExpectedMetadata, Box<dyn Error>> {
+	fn update_file(dir_entry: &DirEntry, options: &ValidateOptions) -> Result<ExpectedMetadata, Box<dyn Error>> {
 		let actual = ActualMetadata::fetch(dir_entry, true)?;
 		let expected = ActualMetadata::to_expected(actual)?;
 
-		if !dry_run {
-			ExpectedMetadata::write(dir_entry, &expected)?;
+		if !options.dry_run {
+			ExpectedMetadata::write(dir_entry, &expected, options)?;
 		}
 
 		Ok(expected)
